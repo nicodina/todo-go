@@ -9,6 +9,7 @@ func main() {
 	log.Print("Running on port " + PORT)
 
 	// Handlers
+	http.HandleFunc("/tasks/", RetrieveTasks)
 	http.HandleFunc("/", HomeTodo)
 
 	// Starting the server 
@@ -19,4 +20,12 @@ func main() {
 // HomeTodo writes back the path to the user
 func HomeTodo(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(r.URL.Path))
+}
+
+// RetrieveTasks gets a specific task
+func RetrieveTasks(w http.ResponseWriter, r *http.Request) {
+	if r.Method == "GET" {
+		id := r.URL.Path[len("/tasks/"):]
+		w.Write([]byte("Retrieving task number " + id))
+	}
 }
