@@ -5,6 +5,11 @@ import (
 	"strings"
 	"log"
 	"net/http"
+	"html/template"
+	"io"
+	"crypto/md5"
+	"strconv"
+	"time"
 )
 
 const port = "8080"
@@ -14,17 +19,41 @@ func sayhelloName(w http.ResponseWriter, r *http.Request) {
 	r.ParseForm()
 	
 	// Let's print something on the server side
-	fmt.Println(r.Form)
-	fmt.Println("path", r.URL.Path)
-	fmt.Println("scheme", r.URL.Scheme)
-	fmt.Println(r.Form["url_long"])
+	log.Println("path", r.URL.Path)
+	log.Println("scheme", r.URL.Scheme)
 	for k, v := range r.Form {
-    	fmt.Println("key:", k)
-    	fmt.Println("val:", strings.Join(v, ""))
+    	log.Println("key:", k)
+    	log.Println("val:", strings.Join(v, ""))
 	}
 
 	// Send data back to the client
 	fmt.Fprintf(w, "Hello Nico!")
+}
+
+func login(w http.ResponseWriter, r *http.Request) {
+
+	log.Println("Login ", r.Method, " request ...")
+
+	if r.Method == "GET" {
+		crutime := time.Now().Unix()
+		h := md5.New()
+		io.WriteString(h, strconv.FormatInt(crutime, 10))
+		token := fmt.Sprintf("%x", h.Sum(nil))
+
+		t, _ := template.ParseFiles("login.html")
+		t.Execute(w, token)
+	} else {
+		r.ParseForm()
+
+		username := template.HTMLEscapeString(r.Form.Get("username"))
+		password := template.HTMLEscapeString(r.Form.Get("password"))
+
+		// Let's simply log data server side
+		log.Println("Username: ", username)
+		log.Println("Password: ", password)
+
+		template.HTMLEscape(w, []byte(r.Form.Get("username")))
+	}
 }
 
 func main() {
@@ -32,8 +61,10 @@ func main() {
 	log.Print("Running on port " + port)
 
 	// Handlers
-	http.Handle("/static/", http.FileServer(http.Dir("public")))
+	http.HandleFunc("/login", login)
 	http.HandleFunc("/", sayhelloName)
+
+	http.Handle("/static/", http.FileServer(http.Dir("public")))
 
 	// Starting the server
 	log.Fatal(http.ListenAndServe(":"+port, nil))
