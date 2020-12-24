@@ -1,31 +1,43 @@
 package main
 
 import (
-	"net/http"
+	"fmt"
+	"strings"
 	"log"
+	"net/http"
 )
+
+const port = "8080"
+
+func sayhelloName(w http.ResponseWriter, r *http.Request) {
+	// Parse arguments
+	r.ParseForm()
+	
+	// Let's print something on the server side
+	fmt.Println(r.Form)
+	fmt.Println("path", r.URL.Path)
+	fmt.Println("scheme", r.URL.Scheme)
+	fmt.Println(r.Form["url_long"])
+	for k, v := range r.Form {
+    	fmt.Println("key:", k)
+    	fmt.Println("val:", strings.Join(v, ""))
+	}
+
+	// Send data back to the client
+	fmt.Fprintf(w, "Hello Nico!")
+}
+
 func main() {
-	const PORT = "8080"
-	log.Print("Running on port " + PORT)
+
+	log.Print("Running on port " + port)
 
 	// Handlers
-	http.HandleFunc("/tasks/", RetrieveTasks)
-	http.HandleFunc("/", HomeTodo)
+	http.Handle("/static/", http.FileServer(http.Dir("public")))
+	http.HandleFunc("/", sayhelloName)
 
-	// Starting the server 
-	log.Fatal(http.ListenAndServe(":"+PORT, nil))
+	// Starting the server
+	log.Fatal(http.ListenAndServe(":"+port, nil))
 
 }
 
-// HomeTodo writes back the path to the user
-func HomeTodo(w http.ResponseWriter, r *http.Request) {
-	w.Write([]byte(r.URL.Path))
-}
 
-// RetrieveTasks gets a specific task
-func RetrieveTasks(w http.ResponseWriter, r *http.Request) {
-	if r.Method == "GET" {
-		id := r.URL.Path[len("/tasks/"):]
-		w.Write([]byte("Retrieving task number " + id))
-	}
-}
