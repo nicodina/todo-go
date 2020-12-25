@@ -1,37 +1,40 @@
 package main
 
 import (
+	"crypto/md5"
 	"fmt"
-	"strings"
-	"os"
-	"log"
-	"net/http"
 	"html/template"
 	"io"
-	"crypto/md5"
+	"log"
+	"net/http"
+	"os"
 	"strconv"
+	"strings"
 	"time"
+
+	_ "github.com/nicodina/memory"
+	"github.com/nicodina/session"
 )
 
 const port = "8080"
 
-var sessionManager *Manager
+var sessionManager *session.Manager
 
 func init() {
-	sessionManager, _ = NewManager("memory", "gosessionid", 3600)
+	sessionManager, _ = session.NewManager("memory", "gosessionid", 3600)
 	go sessionManager.GC()
 }
 
 func sayhelloName(w http.ResponseWriter, r *http.Request) {
 	// Parse arguments
 	r.ParseForm()
-	
+
 	// Let's print something on the server side
 	log.Println("path", r.URL.Path)
 	log.Println("scheme", r.URL.Scheme)
 	for k, v := range r.Form {
-    	log.Println("key:", k)
-    	log.Println("val:", strings.Join(v, ""))
+		log.Println("key:", k)
+		log.Println("val:", strings.Join(v, ""))
 	}
 
 	// Send data back to the client
@@ -43,10 +46,11 @@ func login(w http.ResponseWriter, r *http.Request) {
 	log.Println("Login ", r.Method, " request ...")
 
 	w.Header().Set("Content-Type", "text/html")
+	sess := sessionManager.SessionStart(w, r)
 
 	if r.Method == "GET" {
 		t, _ := template.ParseFiles("login.html")
-		t.Execute(w, createToken())
+		t.Execute(w, sess.Get("username"))
 	} else {
 		r.ParseForm()
 
@@ -57,7 +61,8 @@ func login(w http.ResponseWriter, r *http.Request) {
 		log.Println("Username: ", username)
 		log.Println("Password: ", password)
 
-		template.HTMLEscape(w, []byte(r.Form.Get("username")))
+		sess.Set("username", username)
+		http.Redirect(w, r, "/", 302)
 	}
 }
 
@@ -65,32 +70,32 @@ func uploadFile(w http.ResponseWriter, r *http.Request) {
 
 	log.Println("Upload ", r.Method, " request ...")
 
-   	if r.Method == "GET" {
-       	t, _ := template.ParseFiles("upload.html")
-       	t.Execute(w, createToken())
-   	} else {
-       	r.ParseMultipartForm(32 << 20)
-       	file, handler, err := r.FormFile("uploadfile")
-       	if err != nil {
+	if r.Method == "GET" {
+		t, _ := template.ParseFiles("upload.html")
+		t.Execute(w, createToken())
+	} else {
+		r.ParseMultipartForm(32 << 20)
+		file, handler, err := r.FormFile("uploadfile")
+		if err != nil {
 			log.Println(err)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
-           	return
-       	}
-       	defer file.Close()
-       	fmt.Fprintf(w, "%v", handler.Header)
-       	f, err := os.OpenFile("./test/"+handler.Filename, os.O_WRONLY|os.O_CREATE, 0666)
-       	if err != nil {
+			return
+		}
+		defer file.Close()
+		fmt.Fprintf(w, "%v", handler.Header)
+		f, err := os.OpenFile("./test/"+handler.Filename, os.O_WRONLY|os.O_CREATE, 0666)
+		if err != nil {
 			log.Println(err)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
-           	return
-       	}
-       	defer f.Close()
-       	io.Copy(f, file)
-   	}
+			return
+		}
+		defer f.Close()
+		io.Copy(f, file)
+	}
 }
 
 func createToken() string {
-	
+
 	crutime := time.Now().Unix()
 	h := md5.New()
 
@@ -114,5 +119,3 @@ func main() {
 	log.Fatal(http.ListenAndServe(":"+port, nil))
 
 }
-
-
