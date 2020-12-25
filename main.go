@@ -15,6 +15,13 @@ import (
 
 const port = "8080"
 
+var sessionManager *Manager
+
+func init() {
+	sessionManager, _ = NewManager("memory", "gosessionid", 3600)
+	go sessionManager.GC()
+}
+
 func sayhelloName(w http.ResponseWriter, r *http.Request) {
 	// Parse arguments
 	r.ParseForm()
@@ -34,6 +41,8 @@ func sayhelloName(w http.ResponseWriter, r *http.Request) {
 func login(w http.ResponseWriter, r *http.Request) {
 
 	log.Println("Login ", r.Method, " request ...")
+
+	w.Header().Set("Content-Type", "text/html")
 
 	if r.Method == "GET" {
 		t, _ := template.ParseFiles("login.html")
